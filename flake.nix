@@ -20,6 +20,8 @@
         buildContext = ./nix;
         autoroundScript = ./nix/autoround.sh;
         qwen35bScript = ./nix/auto-round-qwen-3-6-35b-a3b.sh;
+        quantizeScript = ./nix/quantize.sh;
+        commandsScript = ./nix/commands.sh;
 
         runtimeInputs = [
           pkgs.podman
@@ -51,9 +53,24 @@
           text = ''exec bash "${qwen35bScript}" "$@"'';
         };
 
+        # General-purpose `quantize <model> <type>` wrapper. Calls `autoround`
+        # under the hood with B70-tuned defaults (bs=4 ga=2, drop low_gpu_mem,
+        # no torch_compile).
+        quantize = pkgs.writeShellApplication {
+          name = "quantize";
+          runtimeInputs = [ autoround ];
+          text = ''exec bash "${quantizeScript}" "$@"'';
+        };
+
+        commands = pkgs.writeShellApplication {
+          name = "commands";
+          runtimeInputs = [ ];
+          text = ''exec bash "${commandsScript}" "$@"'';
+        };
+
       in {
         packages = {
-          inherit autoround qwen35b;
+          inherit autoround qwen35b quantize commands;
           default = autoround;
         };
 
@@ -61,6 +78,8 @@
           default = flake-utils.lib.mkApp { drv = autoround; };
           autoround = flake-utils.lib.mkApp { drv = autoround; };
           qwen-3-6-35b-a3b = flake-utils.lib.mkApp { drv = qwen35b; };
+          quantize = flake-utils.lib.mkApp { drv = quantize; };
+          commands = flake-utils.lib.mkApp { drv = commands; };
         };
 
         devShells.default = pkgs.mkShell {
@@ -68,6 +87,8 @@
           packages = runtimeInputs ++ [
             autoround
             qwen35b
+            quantize
+            commands
             pkgs.dive
             pkgs.level-zero
             pkgs.intel-compute-runtime
@@ -83,9 +104,12 @@
             export AUTOROUND_SOURCE_DIR="$PWD"
             export AUTOROUND_OUTPUT_DIR="''${AUTOROUND_OUTPUT_DIR:-$PWD/output}"
 
-            echo "auto-round XPU dev environment"
+            echo "auto-round XPU dev environment   (run 'commands' for the full listing)"
             echo ""
-            echo "  autoround <model>                            # quantize (W4A16 auto-round-light, vLLM-ready)"
+            echo "  quantize <model> <type>                      # B70-tuned wrapper (int4|int8|mxfp4|nvfp4|gguf:* ...)"
+            echo "  quantize help                                # full quantize help"
+            echo ""
+            echo "  autoround <model>                            # raw wrapper (auto-round-light, low_gpu_mem ON)"
             echo "  autoround shell                              # interactive shell inside container"
             echo "  autoround run -- <cmd>                       # arbitrary command inside container"
             echo "  autoround build                              # rebuild image (--no-cache)"
@@ -107,9 +131,13 @@
             echo "--- bash -n ---"
             bash -n ${autoroundScript}
             bash -n ${qwen35bScript}
+            bash -n ${quantizeScript}
+            bash -n ${commandsScript}
             echo "--- shellcheck ---"
             shellcheck ${autoroundScript} || true
             shellcheck ${qwen35bScript} || true
+            shellcheck ${quantizeScript} || true
+            shellcheck ${commandsScript} || true
             touch $out
           '';
       });
