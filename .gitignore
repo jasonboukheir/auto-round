@@ -10,3 +10,9 @@ dist/
 CMakeUserPresets.json
 tmp_autoround/
 ut_log_dir/
+
+# nix flake / direnv
+.direnv/
+result
+result-*
+output/

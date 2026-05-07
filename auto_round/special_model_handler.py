@@ -45,6 +45,7 @@ SUPPORT_ONLY_TEXT_MODELS = [
     "glm4v_moe",
     "glm_image",
     "qwen3_vl_moe",
+    "qwen3_5_moe",
     "qwen2_5_omni",
     "qwen3_omni_moe",
     "gemma3",
